@@ -55,6 +55,34 @@ const KNOWN_DEV_APPS: Array<{
 ]
 
 async function extractAppIcon(appPath: string): Promise<string | undefined> {
+  // Strategy 1: read .icns directly from the .app bundle via sips (more reliable in dev mode)
+  try {
+    const resourcesDir = join(appPath, 'Contents', 'Resources')
+    const entries = fs.readdirSync(resourcesDir)
+    const icns = entries.find((e) => e.endsWith('.icns'))
+    if (icns) {
+      const icnsPath = join(resourcesDir, icns)
+      const tmpPath = join(app.getPath('temp'), `ccw_icon_${Date.now()}.png`)
+      await new Promise<void>((resolve, reject) => {
+        const { spawn } = require('child_process')
+        const child = spawn('sips', [
+          '-s', 'format', 'png',
+          icnsPath,
+          '--out', tmpPath,
+          '--resampleHeightWidth', '32', '32'
+        ])
+        child.on('close', (code: number) => (code === 0 ? resolve() : reject(new Error(`sips exit ${code}`))))
+        child.on('error', reject)
+      })
+      const png = fs.readFileSync(tmpPath)
+      fs.unlinkSync(tmpPath)
+      return png.toString('base64')
+    }
+  } catch {
+    // fall through to getFileIcon
+  }
+
+  // Strategy 2: fallback to Electron getFileIcon
   try {
     const icon = await app.getFileIcon(appPath, { size: 'normal' })
     if (icon.isEmpty()) return undefined
