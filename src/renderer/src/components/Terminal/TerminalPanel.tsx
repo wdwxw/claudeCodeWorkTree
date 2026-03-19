@@ -239,7 +239,7 @@ export function TerminalPanel(): React.ReactElement {
       switchToTerminal(wtId, terminal)
     } else {
       // 创建新终端
-      createTerminalForWorktree(wtId, currentCwd).then((terminal) => {
+      createTerminalForWorktree(wtId, currentCwd).then(async (terminal) => {
         if (terminal) {
           // 隐藏其他终端，显示新创建的终端
           for (const [, t] of worktreeTerminals.current) {
@@ -254,6 +254,15 @@ export function TerminalPanel(): React.ReactElement {
           fitAddonRef.current = terminal.fitAddon
           currentPtyId.current = terminal.ptyId
           setTerminalPath(terminal.cwd)
+
+          // 等待 DOM 完成布局后重新 fit，确保首次渲染高度正确
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+          try {
+            terminal.fitAddon.fit()
+            await window.api.pty.resize(terminal.ptyId, terminal.xterm.cols, terminal.xterm.rows)
+          } catch {
+            /* ignore */
+          }
         }
       })
     }
