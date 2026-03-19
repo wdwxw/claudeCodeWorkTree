@@ -132,16 +132,19 @@ export function TerminalPanel(): React.ReactElement {
         return null
       }
 
-      // 拦截多行输入快捷键，直接向 PTY 发送 Claude CLI 期望的转义序列：
-      //   Shift+Enter → \x1b[27;2;13~  （VSCode 模式下 Claude CLI 的 sendSequence 序列）
-      //   Option+Enter → \x1b\r         （macOptionIsMeta:true 通常已够用，此处双重保险）
+      // 拦截多行输入快捷键，直接向 PTY 发送 Claude CLI 期望的转义序列 \x1b\r（ESC+CR）：
+      // Claude CLI 统一用 \x1b\r 作为"插入换行"信号（/terminal-setup 对所有终端写的都是此序列）
+      // Shift+Enter 和 Option+Enter 都映射到同一序列，双通道兜底
       xterm.attachCustomKeyEventHandler((e) => {
         if (e.type !== 'keydown') return true
-        if (e.key === 'Enter' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
-          window.api.pty.write(ptyId, '\x1b[27;2;13~')
+        // Use e.code for more reliable Enter detection across keyboard layouts
+        if (e.code === 'Enter' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
+          window.api.pty.write(ptyId, '\x1b\r')
           return false
         }
-        if (e.key === 'Enter' && e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        if (e.code === 'Enter' && e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault()
           window.api.pty.write(ptyId, '\x1b\r')
           return false
         }

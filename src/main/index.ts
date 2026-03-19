@@ -109,6 +109,55 @@ async function detectInstalledApps(): Promise<DetectedApp[]> {
   return detected
 }
 
+// Claude CLI 用 \u001b\r (ESC+CR) 作为换行信号，keybindings.json 里必须有此绑定才能生效
+// CCW 启动时自动确保绑定存在，用户无需手动运行 /terminal-setup
+const CLAUDE_SHIFT_ENTER_BINDING = {
+  key: 'shift+enter',
+  command: 'workbench.action.terminal.sendSequence',
+  args: { text: '\u001b\r' },
+  when: 'terminalFocus'
+}
+
+function ensureClaudeKeybinding(): void {
+  const home = process.env.HOME || ''
+  const keybindingPaths = [
+    join(home, 'Library/Application Support/Cursor/User/keybindings.json'),
+    join(home, 'Library/Application Support/Code/User/keybindings.json')
+  ]
+
+  for (const filePath of keybindingPaths) {
+    try {
+      if (!fs.existsSync(filePath)) continue
+
+      const raw = fs.readFileSync(filePath, 'utf-8')
+      // 去掉行注释再解析 JSON
+      const stripped = raw.replace(/\/\/[^\n]*/g, '').trim()
+      const bindings: any[] = JSON.parse(stripped || '[]')
+
+      const idx = bindings.findIndex(
+        (b) =>
+          b.key === 'shift+enter' &&
+          b.command === 'workbench.action.terminal.sendSequence'
+      )
+
+      if (idx >= 0) {
+        if (bindings[idx].args?.text === '\u001b\r') continue // 已正确，跳过
+        bindings[idx] = CLAUDE_SHIFT_ENTER_BINDING // 替换错误的旧绑定
+      } else {
+        bindings.push(CLAUDE_SHIFT_ENTER_BINDING) // 新增绑定
+      }
+
+      const output =
+        '// Place your key bindings in this file to override the defaults\n' +
+        JSON.stringify(bindings, null, 4) +
+        '\n'
+      fs.writeFileSync(filePath, output, 'utf-8')
+    } catch {
+      // 忽略不可访问的文件或无效 JSON
+    }
+  }
+}
+
 const store = new Store({
   defaults: {
     repos: [],
@@ -178,6 +227,9 @@ app.whenReady().then(async () => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
+
+  // 自动配置 Claude CLI 换行所需的 IDE keybinding（用户无需手动运行 /terminal-setup）
+  ensureClaudeKeybinding()
 
   // Detect installed apps with icons on startup
   const detectedApps = await detectInstalledApps()
@@ -383,6 +435,7 @@ function registerIpcHandlers(): void {
         ...cleanEnv,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
+        FORCE_COLOR: '3',
         TERM_PROGRAM: 'vscode',
         LANG: process.env.LANG || 'en_US.UTF-8'
       }
