@@ -9,7 +9,7 @@ import { TerminalToolbar } from './TerminalToolbar'
 import { CommandInput } from './CommandInput'
 import { QuickButtonsBar } from './QuickButtonsBar'
 import { TerminalLogModal } from './TerminalLogModal'
-import { TerminalSquare, FolderOpen } from 'lucide-react'
+import { TerminalSquare, FolderOpen, Plus, X, Pencil } from 'lucide-react'
 
 // iTerm2 default dark theme colors
 const XTERM_THEME = {
@@ -44,17 +44,21 @@ interface WorktreeTerminal {
   cwd: string
   fitAddon: FitAddon
   element: HTMLDivElement
+  name: string
+}
+
+interface SessionGroup {
+  sessions: WorktreeTerminal[]
+  activeIndex: number
 }
 
 export function TerminalPanel(): React.ReactElement {
-  // 所有 worktree 终端共用的父容器，各终端在其中拥有独立的子 div
   const containerRef = useRef<HTMLDivElement>(null)
-  // 当前激活的 xterm ref（用于事件绑定和操作）
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const currentPtyId = useRef<string | null>(null)
-  // 存储每个 worktree 的独立终端
-  const worktreeTerminals = useRef(new Map<string, WorktreeTerminal>())
+  // worktreeId -> SessionGroup (多 session 支持)
+  const sessionGroups = useRef(new Map<string, SessionGroup>())
   const currentWorktreeId = useRef<string | null>(null)
   const generationRef = useRef(0)
 
@@ -62,6 +66,12 @@ export function TerminalPanel(): React.ReactElement {
   const [showLogModal, setShowLogModal] = useState(false)
   const [terminalPath, setTerminalPath] = useState('')
   const [logBuffer, setLogBuffer] = useState('')
+  // 驱动 tab 栏重渲染
+  const [sessionVersion, setSessionVersion] = useState(0)
+  // 正在编辑的 tab：{ wtId, index }
+  const [editingTab, setEditingTab] = useState<{ wtId: string; index: number } | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
 
   const selectedRepoId = useRepoStore((s) => s.selectedRepoId)
   const selectedWorktreeId = useRepoStore((s) => s.selectedWorktreeId)
@@ -72,33 +82,29 @@ export function TerminalPanel(): React.ReactElement {
   const currentCwd = selectedWorktree?.path || selectedRepo?.path || ''
   const hasSelection = selectedRepo !== undefined
 
+  const wtId = selectedWorktreeId || (selectedRepoId ? `repo-${selectedRepoId}` : null)
+  const currentGroup = wtId ? sessionGroups.current.get(wtId) : undefined
+  const sessionCount = currentGroup?.sessions.length ?? 0
+  const activeSessionIndex = currentGroup?.activeIndex ?? 0
+
   const destroyAllTerminals = useCallback(async () => {
-    for (const [, terminal] of worktreeTerminals.current) {
-      terminal.cleanup()
-      await window.api.pty.kill(terminal.ptyId)
-      terminal.xterm.dispose()
-      terminal.element.remove()
+    for (const [, group] of sessionGroups.current) {
+      for (const terminal of group.sessions) {
+        terminal.cleanup()
+        await window.api.pty.kill(terminal.ptyId)
+        terminal.xterm.dispose()
+        terminal.element.remove()
+      }
     }
-    worktreeTerminals.current.clear()
+    sessionGroups.current.clear()
     xtermRef.current = null
     fitAddonRef.current = null
     currentPtyId.current = null
     currentWorktreeId.current = null
   }, [])
 
-  const destroyTerminalForWorktree = useCallback(async (wtId: string) => {
-    const terminal = worktreeTerminals.current.get(wtId)
-    if (terminal) {
-      terminal.cleanup()
-      await window.api.pty.kill(terminal.ptyId)
-      terminal.xterm.dispose()
-      terminal.element.remove()
-      worktreeTerminals.current.delete(wtId)
-    }
-  }, [])
-
-  const createTerminalForWorktree = useCallback(
-    async (wtId: string, cwd: string): Promise<WorktreeTerminal | null> => {
+  const createTerminalInstance = useCallback(
+    async (wtId: string, cwd: string, sessionIdx: number): Promise<WorktreeTerminal | null> => {
       if (!containerRef.current || !cwd) return null
 
       const gen = ++generationRef.current
@@ -123,7 +129,7 @@ export function TerminalPanel(): React.ReactElement {
       xterm.loadAddon(new WebLinksAddon())
       xterm.loadAddon(new SearchAddon())
 
-      const ptyId = `pty-${wtId}-${Date.now()}`
+      const ptyId = `pty-${wtId}-s${sessionIdx}-${Date.now()}`
 
       await window.api.pty.create(ptyId, cwd)
 
@@ -132,12 +138,8 @@ export function TerminalPanel(): React.ReactElement {
         return null
       }
 
-      // 拦截多行输入快捷键，直接向 PTY 发送 Claude CLI 期望的转义序列 \x1b\r（ESC+CR）：
-      // Claude CLI 统一用 \x1b\r 作为"插入换行"信号（/terminal-setup 对所有终端写的都是此序列）
-      // Shift+Enter 和 Option+Enter 都映射到同一序列，双通道兜底
       xterm.attachCustomKeyEventHandler((e) => {
         if (e.type !== 'keydown') return true
-        // Use e.code for more reliable Enter detection across keyboard layouts
         if (e.code === 'Enter' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
           e.preventDefault()
           window.api.pty.write(ptyId, '\x1b\r')
@@ -164,14 +166,11 @@ export function TerminalPanel(): React.ReactElement {
         removeExitListener()
       }
 
-      // 每个 worktree 终端拥有独立的 DOM 容器，xterm.open() 只调用一次
-      // 切换终端时只改变 display，不重新调用 open()
       const element = document.createElement('div')
       element.style.cssText = 'position: absolute; inset: 0; display: none;'
       containerRef.current.appendChild(element)
 
       xterm.open(element)
-      // 使用 requestAnimationFrame 确保在 fit() 之前 DOM 完成布局
       await new Promise((resolve) => requestAnimationFrame(resolve))
       try {
         fitAddon.fit()
@@ -189,73 +188,159 @@ export function TerminalPanel(): React.ReactElement {
         return null
       }
 
-      return { xterm, ptyId, cleanup, cwd, fitAddon, element }
+      return { xterm, ptyId, cleanup, cwd, fitAddon, element, name: 'Untitled' }
     },
     []
   )
 
-  const switchToTerminal = useCallback(async (wtId: string, terminal: WorktreeTerminal) => {
-    // 如果已经是当前终端，不需要切换
-    if (currentWorktreeId.current === wtId) return
+  // 激活某个 session（显示其 element，更新 refs）
+  const activateSession = useCallback(
+    async (wtId: string, terminal: WorktreeTerminal, skipWorktreeCheck = false) => {
+      if (!skipWorktreeCheck && currentWorktreeId.current === wtId) {
+        // 仅更新 refs，不跳过（可能切换了 session index）
+      }
 
-    // 隐藏所有终端容器，只显示目标终端的容器
-    // 不重新调用 xterm.open()，避免内部 DOM 引用错乱
-    for (const [, t] of worktreeTerminals.current) {
-      t.element.style.display = 'none'
+      // 隐藏所有 session 的 element
+      for (const [, group] of sessionGroups.current) {
+        for (const t of group.sessions) {
+          t.element.style.display = 'none'
+        }
+      }
+      terminal.element.style.display = 'block'
+
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+      try {
+        terminal.fitAddon.fit()
+      } catch {
+        /* ignore */
+      }
+
+      xtermRef.current = terminal.xterm
+      fitAddonRef.current = terminal.fitAddon
+      currentPtyId.current = terminal.ptyId
+      currentWorktreeId.current = wtId
+      setTerminalPath(terminal.cwd)
+
+      await window.api.pty.resize(terminal.ptyId, terminal.xterm.cols, terminal.xterm.rows)
+      terminal.xterm.focus()
+    },
+    []
+  )
+
+  // 新增一个 session（"+" 按钮调用）
+  const handleAddSession = useCallback(async () => {
+    if (!wtId || !currentCwd) return
+
+    const group = sessionGroups.current.get(wtId)
+    if (!group) return
+
+    const sessionIdx = group.sessions.length
+    const terminal = await createTerminalInstance(wtId, currentCwd, sessionIdx)
+    if (!terminal) return
+
+    group.sessions.push(terminal)
+    group.activeIndex = group.sessions.length - 1
+    setSessionVersion((v) => v + 1)
+
+    await activateSession(wtId, terminal, true)
+  }, [wtId, currentCwd, createTerminalInstance, activateSession])
+
+  // 切换到指定 session index
+  const handleSwitchSession = useCallback(
+    async (index: number) => {
+      if (!wtId) return
+      const group = sessionGroups.current.get(wtId)
+      if (!group || index < 0 || index >= group.sessions.length) return
+      if (group.activeIndex === index) return
+
+      group.activeIndex = index
+      setSessionVersion((v) => v + 1)
+      await activateSession(wtId, group.sessions[index], true)
+    },
+    [wtId, activateSession]
+  )
+
+  // 关闭指定 session
+  const handleCloseSession = useCallback(
+    async (index: number) => {
+      if (!wtId) return
+      const group = sessionGroups.current.get(wtId)
+      if (!group || group.sessions.length <= 1) return // 至少保留一个
+
+      const terminal = group.sessions[index]
+      terminal.cleanup()
+      await window.api.pty.kill(terminal.ptyId)
+      terminal.xterm.dispose()
+      terminal.element.remove()
+
+      group.sessions.splice(index, 1)
+
+      // 调整 activeIndex
+      const newActive = Math.min(group.activeIndex, group.sessions.length - 1)
+      group.activeIndex = newActive
+      setSessionVersion((v) => v + 1)
+
+      // 激活新的 active session
+      await activateSession(wtId, group.sessions[newActive], true)
+    },
+    [wtId, activateSession]
+  )
+
+  // 开始编辑 tab 名称
+  const handleStartEdit = useCallback(
+    (e: React.MouseEvent, targetWtId: string, index: number, currentName: string) => {
+      e.stopPropagation()
+      setEditingTab({ wtId: targetWtId, index })
+      setEditingName(currentName)
+      // 下一帧聚焦输入框
+      requestAnimationFrame(() => editInputRef.current?.focus())
+    },
+    []
+  )
+
+  // 提交编辑
+  const handleCommitEdit = useCallback(() => {
+    if (!editingTab) return
+    const group = sessionGroups.current.get(editingTab.wtId)
+    if (group && group.sessions[editingTab.index]) {
+      group.sessions[editingTab.index].name = editingName.trim() || 'Untitled'
+      setSessionVersion((v) => v + 1)
     }
-    terminal.element.style.display = 'block'
-
-    // 使用 requestAnimationFrame 确保在 fit() 之前 DOM 完成布局
-    await new Promise((resolve) => requestAnimationFrame(resolve))
-
-    try {
-      terminal.fitAddon.fit()
-    } catch {
-      /* ignore */
-    }
-
-    // 更新当前引用
-    xtermRef.current = terminal.xterm
-    fitAddonRef.current = terminal.fitAddon
-    currentPtyId.current = terminal.ptyId
-    currentWorktreeId.current = wtId
-    setTerminalPath(terminal.cwd)
-
-    // 触发 resize 以适应
-    await window.api.pty.resize(terminal.ptyId, terminal.xterm.cols, terminal.xterm.rows)
-  }, [])
+    setEditingTab(null)
+  }, [editingTab, editingName])
 
   // Handle worktree/repo selection and terminal switching
   useEffect(() => {
-    if (!hasSelection || !currentCwd) return
+    if (!hasSelection || !currentCwd || !wtId) return
 
-    // 确定当前 worktree 的唯一标识
-    const wtId = selectedWorktreeId || `repo-${selectedRepoId}`
-
-    // 检查是否已有该 worktree 的终端
-    if (worktreeTerminals.current.has(wtId)) {
-      // 切换到已有终端
-      const terminal = worktreeTerminals.current.get(wtId)!
-      switchToTerminal(wtId, terminal)
+    const existingGroup = sessionGroups.current.get(wtId)
+    if (existingGroup) {
+      // 切换到该 worktree 已有的 active session
+      const terminal = existingGroup.sessions[existingGroup.activeIndex]
+      if (currentWorktreeId.current !== wtId) {
+        activateSession(wtId, terminal)
+        setSessionVersion((v) => v + 1)
+      }
     } else {
-      // 创建新终端
-      createTerminalForWorktree(wtId, currentCwd).then(async (terminal) => {
+      // 首次为该 worktree 创建 session
+      createTerminalInstance(wtId, currentCwd, 0).then(async (terminal) => {
         if (terminal) {
-          // 隐藏其他终端，显示新创建的终端
-          for (const [, t] of worktreeTerminals.current) {
-            t.element.style.display = 'none'
+          // 隐藏所有其他终端
+          for (const [, group] of sessionGroups.current) {
+            for (const t of group.sessions) {
+              t.element.style.display = 'none'
+            }
           }
           terminal.element.style.display = 'block'
 
-          // 创建成功后存入 Map 并更新当前工作目录
-          worktreeTerminals.current.set(wtId, terminal)
+          sessionGroups.current.set(wtId, { sessions: [terminal], activeIndex: 0 })
           currentWorktreeId.current = wtId
           xtermRef.current = terminal.xterm
           fitAddonRef.current = terminal.fitAddon
           currentPtyId.current = terminal.ptyId
           setTerminalPath(terminal.cwd)
+          setSessionVersion((v) => v + 1)
 
-          // 等待 DOM 完成布局后重新 fit，确保首次渲染高度正确
           await new Promise((resolve) => requestAnimationFrame(resolve))
           try {
             terminal.fitAddon.fit()
@@ -263,10 +348,11 @@ export function TerminalPanel(): React.ReactElement {
           } catch {
             /* ignore */
           }
+          terminal.xterm.focus()
         }
       })
     }
-  }, [hasSelection, currentCwd, selectedWorktreeId, selectedRepoId, createTerminalForWorktree, switchToTerminal])
+  }, [hasSelection, currentCwd, selectedWorktreeId, selectedRepoId, wtId, createTerminalInstance, activateSession])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -305,9 +391,6 @@ export function TerminalPanel(): React.ReactElement {
     }
   }, [])
 
-  // 快捷按钮：追加内容到终端当前输入行
-  // autoEnter 时将 \r 作为独立的延迟写入，模拟用户"输入内容 → 再按 Enter"的时序
-  // 若拼在一起写入，Claude Code CLI 会把末尾 \r 当作内容中的换行而非提交信号
   const handleAppendToInput = useCallback((content: string, autoEnter: boolean) => {
     if (currentPtyId.current && content) {
       const ptyId = currentPtyId.current
@@ -320,7 +403,6 @@ export function TerminalPanel(): React.ReactElement {
         }, 50)
       }
     }
-    // 写入后把焦点拉回终端，避免焦点停留在按钮上导致空格/回车重复触发按钮
     xtermRef.current?.focus()
   }, [])
 
@@ -354,6 +436,70 @@ export function TerminalPanel(): React.ReactElement {
           >
             <FolderOpen size={12} />
             <span>Finder</span>
+          </button>
+        </div>
+      )}
+
+      {/* Session tabs bar */}
+      {hasSelection && sessionCount > 0 && (
+        <div className="flex h-7 items-center gap-0.5 border-b border-border-muted bg-bg-primary px-2">
+          {currentGroup?.sessions.map((session, i) => {
+            const isActive = i === activeSessionIndex
+            const isEditing = editingTab?.wtId === wtId && editingTab?.index === i
+            return (
+              <div
+                key={i}
+                className={`group flex items-center gap-1 rounded px-2 py-0.5 text-xs cursor-pointer transition-colors ${
+                  isActive
+                    ? 'bg-bg-elevated text-text-primary'
+                    : 'text-text-muted hover:bg-bg-elevated hover:text-text-secondary'
+                }`}
+                onClick={() => !isEditing && handleSwitchSession(i)}
+              >
+                {isEditing ? (
+                  <input
+                    ref={editInputRef}
+                    className="w-20 rounded border border-border-muted bg-[#2a2a2a] px-1 text-xs text-[#e0e0e0] outline-none ring-1 ring-border-muted"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleCommitEdit()
+                      if (e.key === 'Escape') setEditingTab(null)
+                    }}
+                    onBlur={handleCommitEdit}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <>
+                    <span className="max-w-[80px] truncate">{session.name}</span>
+                    <span
+                      className="invisible group-hover:visible flex items-center justify-center w-3 h-3 rounded-sm text-text-muted hover:text-text-primary"
+                      onClick={(e) => wtId && handleStartEdit(e, wtId, i, session.name)}
+                      title="重命名"
+                    >
+                      <Pencil size={9} />
+                    </span>
+                    <span
+                      className={`flex items-center justify-center w-3 h-3 rounded-sm text-text-muted hover:text-text-primary ${sessionCount > 1 ? 'invisible group-hover:visible' : 'invisible pointer-events-none'}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (sessionCount > 1) handleCloseSession(i)
+                      }}
+                      title="关闭"
+                    >
+                      <X size={9} />
+                    </span>
+                  </>
+                )}
+              </div>
+            )
+          })}
+          <button
+            onClick={handleAddSession}
+            className="flex items-center justify-center w-5 h-5 ml-0.5 rounded text-text-muted hover:bg-bg-elevated hover:text-text-secondary transition-colors"
+            title="新建终端会话"
+          >
+            <Plus size={12} />
           </button>
         </div>
       )}
