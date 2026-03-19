@@ -81,7 +81,7 @@ export function CapsuleButton({ cwd }: CapsuleButtonProps): React.ReactElement {
     <div className="flex items-center gap-2">
       {/* Capsule: Left-Right dual zone */}
       <div className="relative" ref={dropdownRef}>
-        <div className="flex h-7 items-stretch overflow-hidden rounded-full border border-border bg-bg-elevated text-xs shadow-sm">
+        <div className="flex h-7 items-stretch overflow-hidden rounded-lg border border-border bg-bg-elevated text-xs shadow-sm">
           {/* Left zone: last used app with icon badge */}
           <button
             onClick={() => handleOpenApp(lastApp.id)}
@@ -132,7 +132,7 @@ export function CapsuleButton({ cwd }: CapsuleButtonProps): React.ReactElement {
       {selectedWorktree && (
         <button
           onClick={() => setShowMerge(true)}
-          className="flex h-7 items-center gap-1 rounded-full border border-border bg-bg-elevated px-3 text-xs text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
+          className="flex h-7 items-center gap-1 rounded-lg border border-border bg-bg-elevated px-3 text-xs text-text-secondary transition-colors hover:bg-bg-tertiary hover:text-text-primary"
         >
           <GitPullRequest size={13} />
           <span>PR</span>

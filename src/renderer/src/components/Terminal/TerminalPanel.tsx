@@ -7,6 +7,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useRepoStore } from '../../stores/repoStore'
 import { TerminalToolbar } from './TerminalToolbar'
 import { CommandInput } from './CommandInput'
+import { QuickButtonsBar } from './QuickButtonsBar'
 import { TerminalLogModal } from './TerminalLogModal'
 import { TerminalSquare, FolderOpen } from 'lucide-react'
 
@@ -270,6 +271,13 @@ export function TerminalPanel(): React.ReactElement {
     }
   }, [])
 
+  // 快捷按钮：追加内容到终端当前输入行，autoEnter 为 true 时附加换行符执行
+  const handleAppendToInput = useCallback((content: string, autoEnter: boolean) => {
+    if (currentPtyId.current && content) {
+      window.api.pty.write(currentPtyId.current, autoEnter ? content + '\n' : content)
+    }
+  }, [])
+
   const handleShowLog = useCallback(async () => {
     if (currentPtyId.current) {
       const buffer = await window.api.pty.getBuffer(currentPtyId.current)
@@ -321,6 +329,9 @@ export function TerminalPanel(): React.ReactElement {
       {showCommandInput && hasSelection && (
         <CommandInput onSend={handleSendCommand} onClose={() => setShowCommandInput(false)} />
       )}
+
+      {/* Quick buttons bar — above the toolbar */}
+      {hasSelection && <QuickButtonsBar onSend={handleAppendToInput} />}
 
       {/* Toolbar */}
       {hasSelection && (

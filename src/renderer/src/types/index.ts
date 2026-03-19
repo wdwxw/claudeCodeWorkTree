@@ -24,6 +24,13 @@ export interface ExternalApp {
   installed?: boolean
 }
 
+export interface QuickButton {
+  id: string
+  title: string
+  content: string
+  autoEnter: boolean
+}
+
 export interface MergeConfig {
   repoPath: string
   sourceBranch: string
