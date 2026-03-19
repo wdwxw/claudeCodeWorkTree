@@ -305,11 +305,20 @@ export function TerminalPanel(): React.ReactElement {
     }
   }, [])
 
-  // 快捷按钮：追加内容到终端当前输入行，autoEnter 为 true 时附加 \r（真正的 Enter 信号）
-  // 注意：\n 在 Claude Code CLI 等交互式程序中只是换行，不会触发提交；\r 才是 Enter 键的信号
+  // 快捷按钮：追加内容到终端当前输入行
+  // autoEnter 时将 \r 作为独立的延迟写入，模拟用户"输入内容 → 再按 Enter"的时序
+  // 若拼在一起写入，Claude Code CLI 会把末尾 \r 当作内容中的换行而非提交信号
   const handleAppendToInput = useCallback((content: string, autoEnter: boolean) => {
     if (currentPtyId.current && content) {
-      window.api.pty.write(currentPtyId.current, autoEnter ? content + '\r' : content)
+      const ptyId = currentPtyId.current
+      window.api.pty.write(ptyId, content)
+      if (autoEnter) {
+        setTimeout(() => {
+          if (currentPtyId.current === ptyId) {
+            window.api.pty.write(ptyId, '\r')
+          }
+        }, 50)
+      }
     }
     // 写入后把焦点拉回终端，避免焦点停留在按钮上导致空格/回车重复触发按钮
     xtermRef.current?.focus()
