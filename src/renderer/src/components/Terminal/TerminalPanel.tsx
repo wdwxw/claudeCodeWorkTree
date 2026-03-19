@@ -36,14 +36,25 @@ const XTERM_THEME = {
   brightWhite: '#fffefe'
 }
 
+interface WorktreeTerminal {
+  xterm: Terminal
+  ptyId: string
+  cleanup: () => void
+  cwd: string
+  fitAddon: FitAddon
+  element: HTMLDivElement
+}
+
 export function TerminalPanel(): React.ReactElement {
-  const terminalRef = useRef<HTMLDivElement>(null)
+  // 所有 worktree 终端共用的父容器，各终端在其中拥有独立的子 div
+  const containerRef = useRef<HTMLDivElement>(null)
+  // 当前激活的 xterm ref（用于事件绑定和操作）
   const xtermRef = useRef<Terminal | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
   const currentPtyId = useRef<string | null>(null)
-  const cleanupRef = useRef<(() => void) | null>(null)
-  const initializedRef = useRef(false)
-  const lastCwdRef = useRef<string>('')
+  // 存储每个 worktree 的独立终端
+  const worktreeTerminals = useRef(new Map<string, WorktreeTerminal>())
+  const currentWorktreeId = useRef<string | null>(null)
   const generationRef = useRef(0)
 
   const [showCommandInput, setShowCommandInput] = useState(false)
@@ -60,31 +71,36 @@ export function TerminalPanel(): React.ReactElement {
   const currentCwd = selectedWorktree?.path || selectedRepo?.path || ''
   const hasSelection = selectedRepo !== undefined
 
-  const destroyTerminal = useCallback(async () => {
-    if (cleanupRef.current) {
-      cleanupRef.current()
-      cleanupRef.current = null
+  const destroyAllTerminals = useCallback(async () => {
+    for (const [, terminal] of worktreeTerminals.current) {
+      terminal.cleanup()
+      await window.api.pty.kill(terminal.ptyId)
+      terminal.xterm.dispose()
+      terminal.element.remove()
     }
-    if (currentPtyId.current) {
-      await window.api.pty.kill(currentPtyId.current)
-      currentPtyId.current = null
-    }
-    if (xtermRef.current) {
-      xtermRef.current.dispose()
-      xtermRef.current = null
-    }
+    worktreeTerminals.current.clear()
+    xtermRef.current = null
     fitAddonRef.current = null
-    initializedRef.current = false
-    lastCwdRef.current = ''
+    currentPtyId.current = null
+    currentWorktreeId.current = null
   }, [])
 
-  const createTerminal = useCallback(
-    async (cwd: string) => {
-      if (!terminalRef.current || !cwd) return
+  const destroyTerminalForWorktree = useCallback(async (wtId: string) => {
+    const terminal = worktreeTerminals.current.get(wtId)
+    if (terminal) {
+      terminal.cleanup()
+      await window.api.pty.kill(terminal.ptyId)
+      terminal.xterm.dispose()
+      terminal.element.remove()
+      worktreeTerminals.current.delete(wtId)
+    }
+  }, [])
+
+  const createTerminalForWorktree = useCallback(
+    async (wtId: string, cwd: string): Promise<WorktreeTerminal | null> => {
+      if (!containerRef.current || !cwd) return null
 
       const gen = ++generationRef.current
-      await destroyTerminal()
-      if (gen !== generationRef.current) return
 
       const xterm = new Terminal({
         cursorBlink: true,
@@ -105,22 +121,14 @@ export function TerminalPanel(): React.ReactElement {
       xterm.loadAddon(new WebLinksAddon())
       xterm.loadAddon(new SearchAddon())
 
-      xterm.open(terminalRef.current)
-      try {
-        fitAddon.fit()
-      } catch {
-        /* initial fit may fail */
-      }
-
-      xtermRef.current = xterm
-      fitAddonRef.current = fitAddon
-
-      const ptyId = `pty-${Date.now()}`
-      currentPtyId.current = ptyId
+      const ptyId = `pty-${wtId}-${Date.now()}`
 
       await window.api.pty.create(ptyId, cwd)
-      setTerminalPath(cwd)
-      lastCwdRef.current = cwd
+
+      if (gen !== generationRef.current) {
+        await window.api.pty.kill(ptyId)
+        return null
+      }
 
       xterm.onData((data) => window.api.pty.write(ptyId, data))
       xterm.onResize(({ cols, rows }) => window.api.pty.resize(ptyId, cols, rows))
@@ -130,36 +138,107 @@ export function TerminalPanel(): React.ReactElement {
         xterm.writeln('\r\n\x1b[33m终端会话已结束\x1b[0m')
       })
 
-      cleanupRef.current = () => {
+      const cleanup = () => {
         removeDataListener()
         removeExitListener()
       }
 
+      // 每个 worktree 终端拥有独立的 DOM 容器，xterm.open() 只调用一次
+      // 切换终端时只改变 display，不重新调用 open()
+      const element = document.createElement('div')
+      element.style.cssText = 'position: absolute; inset: 0; display: none;'
+      containerRef.current.appendChild(element)
+
+      xterm.open(element)
+      try {
+        fitAddon.fit()
+      } catch {
+        /* initial fit may fail */
+      }
+
       await window.api.pty.resize(ptyId, xterm.cols, xterm.rows)
-      initializedRef.current = true
+
+      if (gen !== generationRef.current) {
+        cleanup()
+        await window.api.pty.kill(ptyId)
+        xterm.dispose()
+        element.remove()
+        return null
+      }
+
+      return { xterm, ptyId, cleanup, cwd, fitAddon, element }
     },
-    [destroyTerminal]
+    []
   )
 
-  // Create terminal when first selecting a repo/worktree
+  const switchToTerminal = useCallback(async (wtId: string, terminal: WorktreeTerminal) => {
+    // 如果已经是当前终端，不需要切换
+    if (currentWorktreeId.current === wtId) return
+
+    // 隐藏所有终端容器，只显示目标终端的容器
+    // 不重新调用 xterm.open()，避免内部 DOM 引用错乱
+    for (const [, t] of worktreeTerminals.current) {
+      t.element.style.display = 'none'
+    }
+    terminal.element.style.display = 'block'
+
+    try {
+      terminal.fitAddon.fit()
+    } catch {
+      /* ignore */
+    }
+
+    // 更新当前引用
+    xtermRef.current = terminal.xterm
+    fitAddonRef.current = terminal.fitAddon
+    currentPtyId.current = terminal.ptyId
+    currentWorktreeId.current = wtId
+    setTerminalPath(terminal.cwd)
+
+    // 触发 resize 以适应
+    await window.api.pty.resize(terminal.ptyId, terminal.xterm.cols, terminal.xterm.rows)
+  }, [])
+
+  // Handle worktree/repo selection and terminal switching
   useEffect(() => {
     if (!hasSelection || !currentCwd) return
 
-    if (!initializedRef.current) {
-      createTerminal(currentCwd)
-    } else if (currentCwd !== lastCwdRef.current && currentPtyId.current) {
-      window.api.pty.write(currentPtyId.current, `cd "${currentCwd}" && clear\n`)
-      setTerminalPath(currentCwd)
-      lastCwdRef.current = currentCwd
+    // 确定当前 worktree 的唯一标识
+    const wtId = selectedWorktreeId || `repo-${selectedRepoId}`
+
+    // 检查是否已有该 worktree 的终端
+    if (worktreeTerminals.current.has(wtId)) {
+      // 切换到已有终端
+      const terminal = worktreeTerminals.current.get(wtId)!
+      switchToTerminal(wtId, terminal)
+    } else {
+      // 创建新终端
+      createTerminalForWorktree(wtId, currentCwd).then((terminal) => {
+        if (terminal) {
+          // 隐藏其他终端，显示新创建的终端
+          for (const [, t] of worktreeTerminals.current) {
+            t.element.style.display = 'none'
+          }
+          terminal.element.style.display = 'block'
+
+          // 创建成功后存入 Map 并更新当前工作目录
+          worktreeTerminals.current.set(wtId, terminal)
+          currentWorktreeId.current = wtId
+          xtermRef.current = terminal.xterm
+          fitAddonRef.current = terminal.fitAddon
+          currentPtyId.current = terminal.ptyId
+          setTerminalPath(terminal.cwd)
+        }
+      })
     }
-  }, [hasSelection, currentCwd, createTerminal])
+  }, [hasSelection, currentCwd, selectedWorktreeId, selectedRepoId, createTerminalForWorktree, switchToTerminal])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      destroyTerminal()
+      destroyAllTerminals()
     }
-  }, [destroyTerminal])
+  }, [destroyAllTerminals])
 
   // Handle window/container resize
   useEffect(() => {
@@ -175,8 +254,8 @@ export function TerminalPanel(): React.ReactElement {
 
     window.addEventListener('resize', handleResize)
     const observer = new ResizeObserver(handleResize)
-    if (terminalRef.current) {
-      observer.observe(terminalRef.current)
+    if (containerRef.current) {
+      observer.observe(containerRef.current)
     }
 
     return () => {
@@ -228,7 +307,7 @@ export function TerminalPanel(): React.ReactElement {
       {/* Terminal body */}
       <div className="relative flex-1 overflow-hidden">
         {hasSelection ? (
-          <div ref={terminalRef} className="h-full w-full bg-terminal-bg" />
+          <div ref={containerRef} className="relative h-full w-full bg-terminal-bg" />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-4 text-text-muted">
             <TerminalSquare size={48} strokeWidth={1} />

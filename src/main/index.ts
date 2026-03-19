@@ -350,13 +350,18 @@ function registerIpcHandlers(): void {
     }
 
     const shell = process.env.SHELL || '/bin/zsh'
+    // 清理会话变量，防止嵌套会话问题（如 CLAUDECODE 导致 claude 命令报错）
+    const cleanEnv = { ...process.env }
+    delete cleanEnv.CLAUDECODE
+    delete cleanEnv.CLASP_SOCKET_PATH
+    delete cleanEnv.CLAUDE_SESSION_PATH
     const pty = ptyModule.spawn(shell, ['--login'], {
       name: 'xterm-256color',
       cols: 80,
       rows: 24,
       cwd: fs.existsSync(cwd) ? cwd : process.env.HOME || '/',
       env: {
-        ...process.env,
+        ...cleanEnv,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
         LANG: process.env.LANG || 'en_US.UTF-8'
