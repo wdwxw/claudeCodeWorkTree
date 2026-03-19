@@ -151,6 +151,8 @@ export function TerminalPanel(): React.ReactElement {
       containerRef.current.appendChild(element)
 
       xterm.open(element)
+      // 使用 requestAnimationFrame 确保在 fit() 之前 DOM 完成布局
+      await new Promise((resolve) => requestAnimationFrame(resolve))
       try {
         fitAddon.fit()
       } catch {
@@ -182,6 +184,9 @@ export function TerminalPanel(): React.ReactElement {
       t.element.style.display = 'none'
     }
     terminal.element.style.display = 'block'
+
+    // 使用 requestAnimationFrame 确保在 fit() 之前 DOM 完成布局
+    await new Promise((resolve) => requestAnimationFrame(resolve))
 
     try {
       terminal.fitAddon.fit()

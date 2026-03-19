@@ -14,8 +14,14 @@ export function AppLayout(): React.ReactElement {
       <AppHeader />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <div className="flex flex-1 flex-col overflow-hidden">
-          {showSettings ? <SettingsPage /> : <TerminalPanel />}
+        <div className="relative flex flex-1 flex-col overflow-hidden">
+          {/* Always keep TerminalPanel mounted to preserve terminal state */}
+          <div className={showSettings ? 'hidden' : 'flex flex-1 flex-col overflow-hidden'}>
+            <TerminalPanel />
+          </div>
+          <div className={showSettings ? 'flex flex-1 flex-col overflow-hidden' : 'hidden'}>
+            <SettingsPage />
+          </div>
         </div>
       </div>
       <StatusBar />
