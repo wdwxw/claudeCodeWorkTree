@@ -114,7 +114,8 @@ export function TerminalPanel(): React.ReactElement {
         allowProposedApi: true,
         scrollback: 10000,
         fontWeight: 'normal',
-        fontWeightBold: 'bold'
+        fontWeightBold: 'bold',
+        macOptionIsMeta: true
       })
 
       const fitAddon = new FitAddon()
@@ -130,6 +131,22 @@ export function TerminalPanel(): React.ReactElement {
         await window.api.pty.kill(ptyId)
         return null
       }
+
+      // 拦截多行输入快捷键，直接向 PTY 发送 Claude CLI 期望的转义序列：
+      //   Shift+Enter → \x1b[27;2;13~  （VSCode 模式下 Claude CLI 的 sendSequence 序列）
+      //   Option+Enter → \x1b\r         （macOptionIsMeta:true 通常已够用，此处双重保险）
+      xterm.attachCustomKeyEventHandler((e) => {
+        if (e.type !== 'keydown') return true
+        if (e.key === 'Enter' && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+          window.api.pty.write(ptyId, '\x1b[27;2;13~')
+          return false
+        }
+        if (e.key === 'Enter' && e.altKey && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+          window.api.pty.write(ptyId, '\x1b\r')
+          return false
+        }
+        return true
+      })
 
       xterm.onData((data) => window.api.pty.write(ptyId, data))
       xterm.onResize(({ cols, rows }) => window.api.pty.resize(ptyId, cols, rows))

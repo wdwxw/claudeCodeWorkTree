@@ -355,6 +355,25 @@ function registerIpcHandlers(): void {
     delete cleanEnv.CLAUDECODE
     delete cleanEnv.CLASP_SOCKET_PATH
     delete cleanEnv.CLAUDE_SESSION_PATH
+    // 清除 VS Code / Cursor 特有标识，防止 Claude CLI 误将嵌入终端识别为
+    // Cursor 终端并尝试配置 Shift+Enter（会与 Cursor 已有绑定冲突）
+    // 去除这些变量后，Claude CLI 将使用标准 xterm Option+Enter 换行流程
+    delete cleanEnv.TERM_PROGRAM
+    delete cleanEnv.TERM_PROGRAM_VERSION
+    delete cleanEnv.VSCODE_INJECTION
+    delete cleanEnv.VSCODE_GIT_IPC_HANDLE
+    delete cleanEnv.VSCODE_GIT_ASKPASS_EXTRA_ARGS
+    delete cleanEnv.VSCODE_GIT_ASKPASS_NODE
+    delete cleanEnv.VSCODE_GIT_ASKPASS_MAIN
+    delete cleanEnv.VSCODE_NONCE
+    delete cleanEnv.VSCODE_PID
+    delete cleanEnv.VSCODE_AMD_ENTRYPOINT
+    delete cleanEnv.VSCODE_CWD
+    delete cleanEnv.VSCODE_HANDLES_UNCAUGHT_ERRORS
+    delete cleanEnv.VSCODE_IPC_HOOK
+    delete cleanEnv.VSCODE_NLS_CONFIG
+    delete cleanEnv.VSCODE_PORTABLE
+    delete cleanEnv.GIT_ASKPASS
     const pty = ptyModule.spawn(shell, ['--login'], {
       name: 'xterm-256color',
       cols: 80,
@@ -364,6 +383,7 @@ function registerIpcHandlers(): void {
         ...cleanEnv,
         TERM: 'xterm-256color',
         COLORTERM: 'truecolor',
+        TERM_PROGRAM: 'vscode',
         LANG: process.env.LANG || 'en_US.UTF-8'
       }
     })
