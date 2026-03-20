@@ -1,54 +1,113 @@
-import { GitBranch, Settings } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { useRepoStore } from '../../stores/repoStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { CapsuleButton } from '../Terminal/CapsuleButton'
 
 export function AppHeader(): React.ReactElement {
-  const repos = useRepoStore((s) => s.repos)
+  const repos          = useRepoStore((s) => s.repos)
   const selectedRepoId = useRepoStore((s) => s.selectedRepoId)
-  const selectedWorktreeId = useRepoStore((s) => s.selectedWorktreeId)
+  const selectedWtId   = useRepoStore((s) => s.selectedWorktreeId)
   const toggleSettings = useSettingsStore((s) => s.toggleSettings)
 
   const selectedRepo = repos.find((r) => r.id === selectedRepoId)
-  const selectedWorktree = selectedRepo?.worktrees.find((w) => w.id === selectedWorktreeId)
-  const currentCwd = selectedWorktree?.path || selectedRepo?.path || ''
+  const selectedWt   = selectedRepo?.worktrees.find((w) => w.id === selectedWtId)
+  const currentCwd   = selectedWt?.path || selectedRepo?.path || ''
 
   return (
-    <div className="drag-region relative z-20 flex h-11 items-center border-b border-border bg-bg-secondary px-4">
-      {/* macOS traffic light space */}
-      <div className="w-16 shrink-0" />
+    <div
+      className="drag-region flex h-10 shrink-0 items-center gap-2"
+      style={{
+        background: 'var(--color-bg-secondary)',
+        borderBottom: '0.5px solid var(--bs)',
+        paddingLeft: 12,
+        paddingRight: 12,
+      }}
+    >
+      {/*
+        ── macOS native traffic light spacer ──────────────────────
+        The OS renders real red/yellow/green buttons here.
+        We only need blank space (~72px). NO custom dots here.
+        This spacer has no no-drag so dragging works over it too.
+      */}
+      <div style={{ width: 72, flexShrink: 0 }} />
 
-      {/* Breadcrumb */}
-      <div className="no-drag flex items-center gap-1.5 text-sm">
-        <GitBranch size={14} className="text-accent" />
-        <span className="font-medium text-text-primary">ccw</span>
-        {selectedRepo && (
+      {/* ── Nav arrows (decorative, no-drag only on buttons) ───── */}
+      <div className="flex items-center gap-px" style={{ flexShrink: 0 }}>
+        <button
+          className="no-drag rounded px-1 leading-none transition-colors duration-100"
+          style={{ color: 'var(--t4)', fontSize: 17, lineHeight: 1 }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--t3)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t4)')}
+          aria-label="back"
+        >‹</button>
+        <button
+          className="no-drag rounded px-1 leading-none transition-colors duration-100"
+          style={{ color: 'var(--t4)', fontSize: 17, lineHeight: 1 }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--t3)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t4)')}
+          aria-label="forward"
+        >›</button>
+      </div>
+
+      {/*
+        ── Breadcrumb — purely informational text, stays draggable ─
+        NO no-drag here: the whole center area should drag the window
+      */}
+      <div
+        className="flex flex-1 items-center justify-center gap-[5px]"
+        style={{ fontSize: 12, userSelect: 'none', pointerEvents: 'none' }}
+      >
+        <span style={{ color: 'var(--t3)', display: 'flex' }}>
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="4"  cy="3.8" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="12" cy="3.8" r="1.5" fill="currentColor" stroke="none"/>
+            <circle cx="4"  cy="12"  r="1.5" fill="currentColor" stroke="none"/>
+            <path d="M4 5.3v5.2"/>
+            <path d="M12 5.3q0 3.2-3.2 4.8c-.9.5-1.1 1-1.1 2.1"/>
+          </svg>
+        </span>
+
+        {selectedRepo
+          ? <span style={{ color: 'var(--t2)' }}>{selectedRepo.name}</span>
+          : <span style={{ color: 'var(--t2)' }}>ccw</span>
+        }
+
+        {selectedWt && (
           <>
-            <span className="text-text-muted">/</span>
-            <span className="text-text-secondary">{selectedRepo.name}</span>
-          </>
-        )}
-        {selectedWorktree && (
-          <>
-            <span className="text-text-muted">/</span>
-            <span className="text-accent">{selectedWorktree.branch}</span>
+            <span style={{ color: 'var(--t4)' }}>›</span>
+            <span className="flex items-center gap-[3px]" style={{ color: 'var(--t2)' }}>
+              {selectedWt.branch}
+              <ChevronDown size={10} style={{ color: 'var(--t3)' }} />
+            </span>
           </>
         )}
       </div>
 
-      <div className="flex-1" />
-
-      {/* Right actions: capsule + time + settings */}
-      <div className="no-drag flex items-center gap-3">
-        {selectedRepo && <CapsuleButton cwd={currentCwd} />}
-        <span className="text-xs text-text-muted">
-          {new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-        </span>
+      {/* ── Right actions — no-drag only on the interactive parts ─ */}
+      <div className="flex items-center gap-[6px]" style={{ flexShrink: 0 }}>
+        {selectedRepo && (
+          <div className="no-drag">
+            <CapsuleButton cwd={currentCwd} />
+          </div>
+        )}
         <button
+          className="no-drag flex items-center justify-center rounded p-1 transition-colors duration-100"
+          style={{ color: 'var(--t4)' }}
           onClick={toggleSettings}
-          className="rounded-md p-1.5 text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--t3)'
+            e.currentTarget.style.background = 'var(--hv)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--t4)'
+            e.currentTarget.style.background = 'transparent'
+          }}
+          aria-label="Settings"
         >
-          <Settings size={15} />
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="8" cy="8" r="2.4"/>
+            <path d="M8 1.5v1.7M8 12.8v1.7M1.5 8h1.7M12.8 8h1.7M3.4 3.4l1.2 1.2M11.4 11.4l1.2 1.2M11.4 4.6l-1.2 1.2M4.6 11.4l-1.2 1.2"/>
+          </svg>
         </button>
       </div>
     </div>

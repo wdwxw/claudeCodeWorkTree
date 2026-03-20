@@ -12,27 +12,55 @@ export function TerminalToolbar({
   onShowLog
 }: TerminalToolbarProps): React.ReactElement {
   return (
-    <div className="flex h-8 items-center gap-1 border-t border-border bg-bg-primary px-3">
-      <button
-        onClick={onToggleCommandInput}
-        className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors ${
-          showCommandInput
-            ? 'bg-accent-muted text-accent'
-            : 'text-text-secondary hover:bg-bg-elevated hover:text-text-primary'
-        }`}
-      >
-        <CornerDownLeft size={13} />
+    <div
+      className="flex items-center gap-[2px] px-2"
+      style={{
+        height: 36,
+        background: 'var(--color-bg-primary)',
+        borderTop: '0.5px solid var(--bs, rgba(255,220,160,0.07))',
+      }}
+    >
+      {/* chip style — matches reference .chip */}
+      <ChipBtn active={showCommandInput} onClick={onToggleCommandInput}>
+        <CornerDownLeft size={12} />
         Enter
-      </button>
-      <button
-        onClick={onShowLog}
-        className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs text-text-secondary transition-colors hover:bg-bg-elevated hover:text-text-primary"
-      >
-        <Eye size={13} />
+      </ChipBtn>
+      <ChipBtn onClick={onShowLog}>
+        <Eye size={12} />
         Show
-      </button>
-
-      <div className="flex-1" />
+      </ChipBtn>
+      <div style={{ flex: 1 }} />
     </div>
+  )
+}
+
+function ChipBtn({
+  children,
+  active,
+  onClick,
+}: {
+  children: React.ReactNode
+  active?: boolean
+  onClick: () => void
+}): React.ReactElement {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-[5px] rounded-[5px] px-2 py-[3px] text-[11.5px] transition-colors duration-100"
+      style={{
+        color: active ? 'var(--t2)' : 'var(--t3)',
+        background: active ? 'var(--hv)' : 'transparent',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = 'var(--t2)'
+        e.currentTarget.style.background = 'var(--hv)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = active ? 'var(--t2)' : 'var(--t3)'
+        e.currentTarget.style.background = active ? 'var(--hv)' : 'transparent'
+      }}
+    >
+      {children}
+    </button>
   )
 }

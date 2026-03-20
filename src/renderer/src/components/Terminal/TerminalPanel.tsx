@@ -9,32 +9,32 @@ import { TerminalToolbar } from './TerminalToolbar'
 import { CommandInput } from './CommandInput'
 import { QuickButtonsBar } from './QuickButtonsBar'
 import { TerminalLogModal } from './TerminalLogModal'
-import { TerminalSquare, FolderOpen, Plus, X, Pencil } from 'lucide-react'
+import { FolderOpen, X, Pencil } from 'lucide-react'
 
-// iTerm2 default dark theme colors
+// Warm terminal theme — closely mirrors reference, subtle warm shift
 const XTERM_THEME = {
-  background: '#1e1e1e',
-  foreground: '#c7c7c7',
-  cursor: '#c7c7c7',
-  cursorAccent: '#1e1e1e',
-  selectionBackground: 'rgba(215, 215, 215, 0.25)',
+  background: '#0f0e0c',
+  foreground: '#c8c2b8',
+  cursor: '#c8c2b8',
+  cursorAccent: '#0f0e0c',
+  selectionBackground: 'rgba(200, 190, 160, 0.20)',
   selectionForeground: undefined,
-  black: '#000000',
+  black: '#181614',
   red: '#c91b00',
   green: '#00c200',
   yellow: '#c7c400',
-  blue: '#0225c7',
-  magenta: '#c930c7',
-  cyan: '#00c5c7',
-  white: '#c7c7c7',
-  brightBlack: '#676767',
+  blue: '#3060d0',
+  magenta: '#c830c0',
+  cyan: '#00b8bc',
+  white: '#c8c2b8',
+  brightBlack: '#686460',
   brightRed: '#ff6d67',
   brightGreen: '#5ff967',
   brightYellow: '#fefb67',
-  brightBlue: '#6871ff',
+  brightBlue: '#6878ff',
   brightMagenta: '#ff76ff',
   brightCyan: '#5ffdff',
-  brightWhite: '#fffefe'
+  brightWhite: '#fffcf4',
 }
 
 interface WorktreeTerminal {
@@ -67,7 +67,7 @@ export function TerminalPanel(): React.ReactElement {
   const [terminalPath, setTerminalPath] = useState('')
   const [logBuffer, setLogBuffer] = useState('')
   // 驱动 tab 栏重渲染
-  const [sessionVersion, setSessionVersion] = useState(0)
+  const [_sessionVersion, setSessionVersion] = useState(0)
   // 正在编辑的 tab：{ wtId, index }
   const [editingTab, setEditingTab] = useState<{ wtId: string; index: number } | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -450,44 +450,61 @@ export function TerminalPanel(): React.ReactElement {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Terminal header bar */}
+      {/* ── Single unified tabbar (34px, matches reference) ─────── */}
       {hasSelection && (
-        <div className="flex h-9 items-center justify-between border-b border-border bg-bg-primary px-3">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <TerminalSquare size={13} className="text-text-secondary" />
-            <span className="max-w-[500px] truncate">{terminalPath}</span>
-          </div>
-          <button
-            onClick={handleOpenInFinder}
-            className="flex h-6 items-center gap-1.5 rounded-md px-2 text-[11px] text-text-muted transition-colors hover:bg-bg-elevated hover:text-text-secondary"
-            title="在 Finder 中打开"
-          >
-            <FolderOpen size={12} />
-            <span>Finder</span>
-          </button>
-        </div>
-      )}
-
-      {/* Session tabs bar */}
-      {hasSelection && sessionCount > 0 && (
-        <div className="flex h-7 items-center gap-0.5 border-b border-border bg-bg-primary px-2">
-          {currentGroup?.sessions.map((session, i) => {
-            const isActive = i === activeSessionIndex
+        <div
+          className="flex items-stretch shrink-0"
+          style={{
+            height: 34,
+            background: 'var(--color-bg-secondary)',
+            borderBottom: '0.5px solid var(--bs, rgba(255,220,160,0.07))',
+          }}
+        >
+          {/* Session tabs */}
+          {sessionCount > 0 && currentGroup?.sessions.map((session, i) => {
+            const isActive  = i === activeSessionIndex
             const isEditing = editingTab?.wtId === wtId && editingTab?.index === i
             return (
               <div
                 key={i}
-                className={`group flex items-center gap-1 rounded px-2 py-0.5 text-xs cursor-pointer transition-colors ${
-                  isActive
-                    ? 'bg-bg-elevated text-text-primary'
-                    : 'text-text-muted hover:bg-bg-elevated hover:text-text-secondary'
-                }`}
+                className="group relative flex cursor-pointer items-center gap-[6px] whitespace-nowrap transition-colors duration-100"
+                style={{
+                  padding: '0 14px',
+                  fontSize: 12,
+                  color: isActive ? 'var(--t1)' : 'var(--t4)',
+                  borderBottom: isActive
+                    ? '1.5px solid var(--t1)'
+                    : '1.5px solid transparent',
+                  position: 'relative',
+                  top: '0.5px',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.color = 'var(--t3)'
+                    e.currentTarget.style.background = 'rgba(255,220,160,0.02)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.color = 'var(--t4)'
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
                 onClick={() => !isEditing && handleSwitchSession(i)}
               >
+                {/* ✴ star prefix — matches reference */}
+                <span style={{ color: isActive ? 'var(--t2)' : 'var(--t4)', fontSize: 12, lineHeight: 1 }}>
+                  ✴
+                </span>
                 {isEditing ? (
                   <input
                     ref={editInputRef}
-                    className="w-20 rounded border border-border-muted bg-[#2a2a2a] px-1 text-xs text-[#e0e0e0] outline-none ring-1 ring-border-muted"
+                    className="w-20 rounded px-1 text-[11px] outline-none"
+                    style={{
+                      background: 'var(--color-bg-elevated)',
+                      border: '0.5px solid var(--bm)',
+                      color: 'var(--t1)',
+                    }}
                     value={editingName}
                     onChange={(e) => setEditingName(e.target.value)}
                     onKeyDown={(e) => {
@@ -498,49 +515,122 @@ export function TerminalPanel(): React.ReactElement {
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
-                  <>
-                    <span className="max-w-[80px] truncate">{session.name}</span>
+                  <span className="max-w-[80px] truncate">{session.name}</span>
+                )}
+                {/* Edit + close — visible on hover */}
+                {!isEditing && (
+                  <span
+                    className="invisible group-hover:visible flex items-center gap-[2px]"
+                    style={{ marginLeft: 2 }}
+                  >
                     <span
-                      className="invisible group-hover:visible flex items-center justify-center w-3 h-3 rounded-sm text-text-muted hover:text-text-primary"
+                      className="flex items-center justify-center w-3 h-3 rounded"
+                      style={{ color: 'var(--t4)' }}
                       onClick={(e) => wtId && handleStartEdit(e, wtId, i, session.name)}
                       title="重命名"
+                      onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--t3)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t4)')}
                     >
-                      <Pencil size={9} />
+                      <Pencil size={8} />
                     </span>
-                    <span
-                      className={`flex items-center justify-center w-3 h-3 rounded-sm text-text-muted hover:text-text-primary ${sessionCount > 1 ? 'invisible group-hover:visible' : 'invisible pointer-events-none'}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (sessionCount > 1) handleCloseSession(i)
-                      }}
-                      title="关闭"
-                    >
-                      <X size={9} />
-                    </span>
-                  </>
+                    {sessionCount > 1 && (
+                      <span
+                        className="flex items-center justify-center w-3 h-3 rounded"
+                        style={{ color: 'var(--t4)' }}
+                        onClick={(e) => { e.stopPropagation(); handleCloseSession(i) }}
+                        title="关闭"
+                        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--t3)')}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t4)')}
+                      >
+                        <X size={8} />
+                      </span>
+                    )}
+                  </span>
                 )}
               </div>
             )
           })}
-          <button
+
+          {/* + new session — tab-plus style */}
+          <div
+            className="flex cursor-pointer items-center px-2 transition-colors duration-100"
+            style={{
+              fontSize: 17,
+              lineHeight: 1,
+              color: 'var(--t4)',
+              borderBottom: '1.5px solid transparent',
+              position: 'relative',
+              top: '0.5px',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--t3)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t4)')}
             onClick={handleAddSession}
-            className="flex items-center justify-center w-5 h-5 ml-0.5 rounded text-text-muted hover:bg-bg-elevated hover:text-text-secondary transition-colors"
-            title="新建终端会话"
+            title="新建终端会话 (⌘T)"
           >
-            <Plus size={12} />
-          </button>
+            +
+          </div>
+
+          {/* Spacer */}
+          <div style={{ flex: 1 }} />
+
+          {/* Right: path + finder button */}
+          <div
+            className="flex items-center gap-2 pr-3"
+            style={{ color: 'var(--t4)', fontSize: 11 }}
+          >
+            <span className="max-w-[300px] truncate">{terminalPath}</span>
+            <button
+              onClick={handleOpenInFinder}
+              className="flex items-center gap-1 rounded px-[6px] py-[3px] transition-colors duration-100"
+              style={{ color: 'var(--t4)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--t3)'
+                e.currentTarget.style.background = 'var(--hv)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--t4)'
+                e.currentTarget.style.background = 'transparent'
+              }}
+              title="在 Finder 中打开"
+            >
+              <FolderOpen size={12} />
+            </button>
+            {/* clock icon */}
+            <button
+              className="flex items-center justify-center rounded p-[3px] transition-colors duration-100"
+              style={{ color: 'var(--t4)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--t3)'
+                e.currentTarget.style.background = 'var(--hv)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = 'var(--t4)'
+                e.currentTarget.style.background = 'transparent'
+              }}
+              onClick={handleShowLog}
+              title="查看日志"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="8" cy="8" r="6"/><path d="M8 5v3.5l2.5 1.4"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Terminal body */}
       <div className="relative flex-1 overflow-hidden">
         {hasSelection ? (
-          <div ref={containerRef} className="relative h-full w-full bg-terminal-bg" />
+          <div ref={containerRef} className="relative h-full w-full" style={{ background: '#0f0e0c' }} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-4 text-text-muted">
-            <TerminalSquare size={48} strokeWidth={1} />
-            <p className="text-sm">选择一个仓库或 Worktree 开始</p>
-            <p className="text-xs">左侧面板添加 Git 仓库，然后创建 Worktree</p>
+          <div className="flex h-full flex-col items-center justify-center gap-3">
+            <svg width="40" height="40" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: 'var(--t4)', opacity: 0.35 }}>
+              <rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/>
+              <path d="M4 6l2.5 2L4 10M8.5 10h3.5"/>
+            </svg>
+            <p className="text-[12px]" style={{ color: 'var(--t3)', opacity: 0.7 }}>选择一个 Worktree 开始</p>
+            <p className="text-[11px]" style={{ color: 'var(--t4)', opacity: 0.5 }}>左侧面板添加 Git 仓库，然后创建 Worktree</p>
           </div>
         )}
       </div>

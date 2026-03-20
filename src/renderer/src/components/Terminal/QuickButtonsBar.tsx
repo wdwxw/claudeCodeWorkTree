@@ -6,17 +6,31 @@ interface QuickButtonsBarProps {
 
 export function QuickButtonsBar({ onSend }: QuickButtonsBarProps): React.ReactElement | null {
   const quickButtons = useSettingsStore((s) => s.quickButtons)
-
   if (quickButtons.length === 0) return null
 
   return (
-    <div className="flex flex-wrap gap-1 border-t border-border bg-bg-primary px-3 py-1.5">
+    <div
+      className="flex flex-wrap gap-1 px-3 py-2"
+      style={{
+        background: 'var(--color-bg-primary)',
+        borderTop: '0.5px solid var(--bs, rgba(255,220,160,0.07))',
+      }}
+    >
       {quickButtons.map((btn) => (
         <button
           key={btn.id}
           onClick={() => onSend(btn.content, btn.autoEnter)}
           title={btn.autoEnter ? `${btn.content}  （自动 Enter）` : btn.content}
-          className="rounded-md border border-border-muted bg-bg-secondary px-2.5 py-1 text-xs text-text-secondary transition-colors hover:border-accent hover:bg-accent-muted hover:text-accent"
+          className="flex items-center gap-[5px] rounded-[5px] px-2 py-[3px] text-[11.5px] transition-colors duration-100"
+          style={{ color: 'var(--t3)' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--t2)'
+            e.currentTarget.style.background = 'var(--hv)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--t3)'
+            e.currentTarget.style.background = 'transparent'
+          }}
         >
           {btn.title}
         </button>

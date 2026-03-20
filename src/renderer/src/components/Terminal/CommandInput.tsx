@@ -10,14 +10,10 @@ export function CommandInput({ onSend, onClose }: CommandInputProps): React.Reac
   const [command, setCommand] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
+  useEffect(() => { textareaRef.current?.focus() }, [])
 
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
+    const handleEsc = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [onClose])
@@ -26,26 +22,38 @@ export function CommandInput({ onSend, onClose }: CommandInputProps): React.Reac
     const el = textareaRef.current
     if (!el) return
     el.style.height = 'auto'
-    const lineHeight = 20
-    const maxLines = 3
-    const newHeight = Math.min(el.scrollHeight, lineHeight * maxLines)
-    el.style.height = `${newHeight}px`
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [command])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (command.trim()) {
-        onSend(command)
-        setCommand('')
-      }
+      if (command.trim()) { onSend(command); setCommand('') }
     }
   }
 
   return (
-    <div className="border-t border-border bg-bg-primary">
-      <div className="flex items-start gap-2 px-3 py-2">
-        <span className="mt-1.5 font-mono text-sm text-accent">$</span>
+    /* input-zone */
+    <div
+      style={{
+        borderTop: '0.5px solid var(--bs, rgba(255,220,160,0.07))',
+        padding: '14px 18px',
+        background: 'var(--color-bg-primary)',
+        flexShrink: 0,
+      }}
+    >
+      {/* input-card */}
+      <div
+        className="overflow-hidden transition-colors duration-150"
+        style={{
+          background: 'var(--color-bg-secondary)',
+          border: '0.5px solid var(--bm, rgba(255,220,160,0.10))',
+          borderRadius: 10,
+        }}
+        onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(255,220,160,0.18)')}
+        onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--bm, rgba(255,220,160,0.10))')}
+      >
+        {/* textarea */}
         <textarea
           ref={textareaRef}
           value={command}
@@ -53,29 +61,74 @@ export function CommandInput({ onSend, onClose }: CommandInputProps): React.Reac
           onKeyDown={handleKeyDown}
           placeholder="输入命令, Enter 发送, Shift+Enter 换行..."
           rows={1}
-          className="flex-1 resize-none overflow-y-auto bg-transparent font-mono text-sm leading-5 text-text-primary placeholder-text-muted outline-none"
-          style={{ minHeight: '20px', maxHeight: '60px' }}
-        />
-        <button
-          onClick={() => {
-            if (command.trim()) {
-              onSend(command)
-              setCommand('')
-            }
+          style={{
+            display: 'block',
+            width: '100%',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            color: 'var(--t2)',
+            fontSize: 13,
+            lineHeight: 1.55,
+            padding: '12px 14px 10px',
+            resize: 'none',
+            minHeight: 52,
+            maxHeight: 200,
+            fontFamily: 'var(--font-mono)',
           }}
-          className="mt-0.5 rounded-full bg-accent p-1.5 text-white transition-colors hover:bg-accent-hover"
+          className="placeholder-[var(--t4)]"
+        />
+
+        {/* input-bar */}
+        <div
+          className="flex items-center gap-[5px]"
+          style={{
+            padding: '6px 10px 8px',
+            borderTop: '0.5px solid var(--bs, rgba(255,220,160,0.07))',
+          }}
         >
-          <Send size={13} />
-        </button>
-        <button
-          onClick={onClose}
-          className="mt-0.5 rounded p-1.5 text-text-muted transition-colors hover:text-text-secondary"
-        >
-          <X size={14} />
-        </button>
-      </div>
-      <div className="px-3 pb-1.5 text-[10px] text-text-muted">
-        Enter 发送, Shift+Enter 换行, Esc 关闭
+          <span className="text-[11px]" style={{ color: 'var(--t4)' }}>
+            Enter 发送 · Shift+Enter 换行
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center rounded p-[3px] transition-colors duration-100"
+            style={{ color: 'var(--t4)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--t3)'
+              e.currentTarget.style.background = 'var(--hv)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--t4)'
+              e.currentTarget.style.background = 'transparent'
+            }}
+            title="关闭 (Esc)"
+          >
+            <X size={13} />
+          </button>
+          {/* send-btn — matches reference */}
+          <button
+            onClick={() => { if (command.trim()) { onSend(command); setCommand('') } }}
+            className="flex items-center justify-center rounded-[6px] p-[5px] transition-colors duration-100"
+            style={{
+              background: 'rgba(255,220,160,0.07)',
+              border: '0.5px solid var(--bm, rgba(255,220,160,0.10))',
+              color: 'var(--t3)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,220,160,0.13)'
+              e.currentTarget.style.color = 'var(--t1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,220,160,0.07)'
+              e.currentTarget.style.color = 'var(--t3)'
+            }}
+            title="发送 (Enter)"
+          >
+            <Send size={13} />
+          </button>
+        </div>
       </div>
     </div>
   )
