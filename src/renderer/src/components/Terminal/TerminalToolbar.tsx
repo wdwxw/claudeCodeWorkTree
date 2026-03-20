@@ -12,7 +12,7 @@ export function TerminalToolbar({
   onShowLog
 }: TerminalToolbarProps): React.ReactElement {
   return (
-    <div className="flex h-8 items-center gap-1 border-t border-border-muted bg-bg-primary px-3">
+    <div className="flex h-8 items-center gap-1 border-t border-border bg-bg-primary px-3">
       <button
         onClick={onToggleCommandInput}
         className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs transition-colors ${

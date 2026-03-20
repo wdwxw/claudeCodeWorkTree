@@ -7,9 +7,9 @@ export function Sidebar(): React.ReactElement {
   const repos = useRepoStore((s) => s.repos)
 
   return (
-    <div className="flex h-full w-60 shrink-0 flex-col border-r border-border-muted bg-bg-secondary">
+    <div className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-bg-secondary">
       {/* Header */}
-      <div className="flex h-10 items-center justify-between border-b border-border-muted px-3">
+      <div className="flex h-10 items-center justify-between border-b border-border px-3">
         <span className="text-xs font-semibold tracking-wide text-text-secondary uppercase">
           工作区
         </span>

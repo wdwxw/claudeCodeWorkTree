@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, ArrowLeft, Save } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Save, Check } from 'lucide-react'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useToastStore } from '../../stores/toastStore'
 import type { ExternalApp, QuickButton } from '../../types'
@@ -11,6 +11,8 @@ export function SettingsPage(): React.ReactElement {
   const quickButtons = useSettingsStore((s) => s.quickButtons)
   const setQuickButtons = useSettingsStore((s) => s.setQuickButtons)
   const toggleSettings = useSettingsStore((s) => s.toggleSettings)
+  const theme = useSettingsStore((s) => s.theme)
+  const setTheme = useSettingsStore((s) => s.setTheme)
   const addToast = useToastStore((s) => s.addToast)
 
   const [apps, setApps] = useState<ExternalApp[]>(externalApps)
@@ -78,6 +80,65 @@ export function SettingsPage(): React.ReactElement {
           </button>
           <h1 className="text-lg font-medium text-text-primary">设置</h1>
         </div>
+
+        {/* Theme */}
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-medium text-text-primary">主题风格</h2>
+          <p className="mb-4 text-xs text-text-muted">选择应用外观配色，立即生效</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setTheme('dazi')}
+              className={`relative flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
+                theme === 'dazi'
+                  ? 'border-accent bg-accent-muted'
+                  : 'border-border-muted bg-bg-secondary hover:border-border'
+              }`}
+            >
+              {/* 打子主题预览色块 */}
+              <div className="flex gap-1">
+                <div className="h-8 w-5 rounded-sm" style={{ background: '#161B22' }} />
+                <div className="h-8 w-10 rounded-sm" style={{ background: '#0D1117' }} />
+                <div className="flex flex-col gap-1">
+                  <div className="h-3 w-8 rounded-sm" style={{ background: '#1A56DB' }} />
+                  <div className="h-1.5 w-8 rounded-sm" style={{ background: '#30363D' }} />
+                  <div className="h-1.5 w-6 rounded-sm" style={{ background: '#30363D' }} />
+                </div>
+              </div>
+              <span className="text-left text-xs font-medium text-text-primary">打子</span>
+              {theme === 'dazi' && (
+                <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-white">
+                  <Check size={10} />
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => setTheme('brown')}
+              className={`relative flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
+                theme === 'brown'
+                  ? 'border-accent bg-accent-muted'
+                  : 'border-border-muted bg-bg-secondary hover:border-border'
+              }`}
+            >
+              {/* 棕色主题预览色块 */}
+              <div className="flex gap-1">
+                <div className="h-8 w-5 rounded-sm" style={{ background: '#161310' }} />
+                <div className="h-8 w-10 rounded-sm" style={{ background: '#1d1b18' }} />
+                <div className="flex flex-col gap-1">
+                  <div className="h-3 w-8 rounded-sm" style={{ background: '#b87840' }} />
+                  <div className="h-1.5 w-8 rounded-sm" style={{ background: '#302820' }} />
+                  <div className="h-1.5 w-6 rounded-sm" style={{ background: '#302820' }} />
+                </div>
+              </div>
+              <span className="text-left text-xs font-medium text-text-primary">棕色</span>
+              {theme === 'brown' && (
+                <span className="absolute right-2 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-white">
+                  <Check size={10} />
+                </span>
+              )}
+            </button>
+          </div>
+        </section>
 
         {/* External Apps */}
         <section className="mb-8">

@@ -43,7 +43,7 @@ export function CommandInput({ onSend, onClose }: CommandInputProps): React.Reac
   }
 
   return (
-    <div className="border-t border-border-muted bg-bg-primary">
+    <div className="border-t border-border bg-bg-primary">
       <div className="flex items-start gap-2 px-3 py-2">
         <span className="mt-1.5 font-mono text-sm text-accent">$</span>
         <textarea

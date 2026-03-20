@@ -15,7 +15,7 @@ export function StatusBar(): React.ReactElement {
   )
 
   return (
-    <div className="flex h-6 items-center border-t border-border-muted bg-bg-secondary px-3 text-[11px]">
+    <div className="flex h-6 items-center border-t border-border bg-bg-secondary px-3 text-[11px]">
       {/* Branch indicator */}
       {selectedWorktree && (
         <div className="flex items-center gap-1.5 text-text-secondary">

@@ -6,11 +6,16 @@ import { useSettingsStore } from './stores/settingsStore'
 export default function App(): React.ReactElement {
   const loadRepos = useRepoStore((s) => s.loadRepos)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
+  const theme = useSettingsStore((s) => s.theme)
 
   useEffect(() => {
     loadRepos()
     loadSettings()
   }, [loadRepos, loadSettings])
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme === 'brown' ? 'brown' : '')
+  }, [theme])
 
   return <AppLayout />
 }

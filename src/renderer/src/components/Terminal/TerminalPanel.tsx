@@ -361,6 +361,34 @@ export function TerminalPanel(): React.ReactElement {
     }
   }, [destroyAllTerminals])
 
+  // Global keyboard shortcuts for terminal sessions
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!e.metaKey) return
+      if (!hasSelection || !wtId) return
+
+      const group = sessionGroups.current.get(wtId)
+      if (!group) return
+
+      // Cmd+T: 新建会话
+      if (e.key === 't' || e.key === 'T') {
+        e.preventDefault()
+        handleAddSession()
+        return
+      }
+
+      // Cmd+W: 关闭当前会话（至少保留一个）
+      if ((e.key === 'w' || e.key === 'W') && group.sessions.length > 1) {
+        e.preventDefault()
+        handleCloseSession(activeSessionIndex)
+        return
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [hasSelection, wtId, handleAddSession, handleCloseSession, activeSessionIndex])
+
   // Handle window/container resize
   useEffect(() => {
     const handleResize = (): void => {
@@ -424,7 +452,7 @@ export function TerminalPanel(): React.ReactElement {
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Terminal header bar */}
       {hasSelection && (
-        <div className="flex h-9 items-center justify-between border-b border-border-muted bg-bg-primary px-3">
+        <div className="flex h-9 items-center justify-between border-b border-border bg-bg-primary px-3">
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <TerminalSquare size={13} className="text-text-secondary" />
             <span className="max-w-[500px] truncate">{terminalPath}</span>
@@ -442,7 +470,7 @@ export function TerminalPanel(): React.ReactElement {
 
       {/* Session tabs bar */}
       {hasSelection && sessionCount > 0 && (
-        <div className="flex h-7 items-center gap-0.5 border-b border-border-muted bg-bg-primary px-2">
+        <div className="flex h-7 items-center gap-0.5 border-b border-border bg-bg-primary px-2">
           {currentGroup?.sessions.map((session, i) => {
             const isActive = i === activeSessionIndex
             const isEditing = editingTab?.wtId === wtId && editingTab?.index === i

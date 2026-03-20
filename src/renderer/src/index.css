@@ -3,6 +3,7 @@
 @tailwind utilities;
 
 @layer base {
+  /* 打子主题（默认） */
   :root {
     --color-bg-primary: #0D1117;
     --color-bg-secondary: #161B22;
@@ -11,20 +12,55 @@
     --color-accent: #1A56DB;
     --color-accent-hover: #1E63F0;
     --color-accent-muted: rgba(26, 86, 219, 0.15);
+    --color-accent-subtle: #182848;
+    --color-accent-surface: #1B2F52;
+    --color-accent-glow: #1A3A6B;
     --color-text-primary: #E6EDF3;
     --color-text-secondary: #8B949E;
     --color-text-muted: #484F58;
     --color-border: #30363D;
     --color-border-muted: #21262D;
     --color-success: #3FB950;
+    --color-success-subtle: #1B3027;
     --color-warning: #D29922;
+    --color-warning-subtle: #2D2714;
     --color-danger: #F85149;
+    --color-danger-subtle: #301416;
     --color-terminal-bg: #1e1e1e;
     --color-terminal-green: #3FB950;
     --color-terminal-cyan: #58D1EB;
     --color-terminal-yellow: #D29922;
     --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Menlo', monospace;
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  /* 棕色主题 — 基于 Cursor 暖棕色调 */
+  [data-theme="brown"] {
+    --color-bg-primary: #1c1916;
+    --color-bg-secondary: #171412;
+    --color-bg-tertiary: #241f1a;
+    --color-bg-elevated: #2a2520;
+    --color-accent: #c08040;
+    --color-accent-hover: #d08e4a;
+    --color-accent-muted: rgba(192, 128, 64, 0.16);
+    --color-accent-subtle: #2d2010;
+    --color-accent-surface: #352514;
+    --color-accent-glow: #3d2a16;
+    --color-text-primary: #d8d0c4;
+    --color-text-secondary: #908478;
+    --color-text-muted: #58504a;
+    --color-border: #352d25;
+    --color-border-muted: #2a2420;
+    --color-success: #5db870;
+    --color-success-subtle: #1a2e1a;
+    --color-warning: #c89830;
+    --color-warning-subtle: #2a2210;
+    --color-danger: #e85548;
+    --color-danger-subtle: #2a1214;
+    --color-terminal-bg: #151210;
+    --color-terminal-green: #5db870;
+    --color-terminal-cyan: #50c4d4;
+    --color-terminal-yellow: #c89830;
   }
 
   * {

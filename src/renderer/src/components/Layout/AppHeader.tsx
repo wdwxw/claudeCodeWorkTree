@@ -14,7 +14,7 @@ export function AppHeader(): React.ReactElement {
   const currentCwd = selectedWorktree?.path || selectedRepo?.path || ''
 
   return (
-    <div className="drag-region relative z-20 flex h-11 items-center border-b border-border-muted bg-bg-secondary px-4">
+    <div className="drag-region relative z-20 flex h-11 items-center border-b border-border bg-bg-secondary px-4">
       {/* macOS traffic light space */}
       <div className="w-16 shrink-0" />
 
